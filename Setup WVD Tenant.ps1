@@ -12,16 +12,17 @@ $onmicosofttenant = Read-Host -Prompt 'Tenant we are working with, example clien
 # Install Azure PowerShell Module
 if (! (Get-InstalledModule -Name Az -AllVersions)){
     Install-Module -Name Az -AllowClobber -Scope AllUsers
-} else {Write-Host 'Azure Module Already Installed'}
+} else {Write-Host -Object 'Azure Module Already Installed' -BackgroundColor Green}
 
 # Install Windows Virutal Desktop PowerShell Module
 if (! ( Get-InstalledModule -Name Microsoft.RDInfra.RDPowerShell -AllVersions)){
     Install-Module -Name Microsoft.RDInfra.RDPowerShell
-} else {Write-Host 'Windows Virtual Desktop Module Already Installed'}
+} else {Write-Host -Object 'Windows Virtual Desktop Module Already Installed' -BackgroundColor Green}
+
 # Install AzureAd PowerShell Module
 if (! ( Get-InstalledModule -Name AzureAD -AllVersions)){
     Install-Module -Name AzureAD
-} else {Write-Host 'AzureAD Module Already Installed'}
+} else {Write-Host -Object 'AzureAD Module Already Installed' -BackgroundColor Green}
 
 # Grant permissions to Windows Virtual Desktop
 # https://docs.microsoft.com/en-us/azure/virtual-desktop/tenant-setup-azure-active-directory#grant-permissions-to-windows-virtual-desktop
@@ -29,7 +30,7 @@ if (! ( Get-InstalledModule -Name AzureAD -AllVersions)){
 Start 'https://login.microsoftonline.com/common/adminconsent?client_id=5a0aa725-4958-4b0c-80a9-34562e23f3b7&redirect_uri=https%3A%2F%2Frdweb.wvd.microsoft.com%2FRDWeb%2FConsentCallback'
 
 # Allow time to grant permissions
-Start-Sleep -Seconds 60
+Start-Sleep -Seconds 30
 
 # Get AadTenantId
 Connect-AzAccount
@@ -37,7 +38,7 @@ $AadTenatnId = (Get-AzTenant).Id
 
 # Get Azure Subscriptions and select subscription
 Get-AzSubscription
-$AzureSub = Read-Host -Prompt 'What Auzre Subscription would you like to use for the WVD Tenant, copy and past from above available subscriptions'
+$AzureSub = Read-Host -Prompt 'What Auzre Subscription would you like to use for the WVD Tenant, copy AzSubscription ID and paste from above available subscriptions'
 
 # Connect and create WVD tenant
 Add-RdsAccount -DeploymentUrl "https://rdbroker.wvd.microsoft.com"
@@ -55,12 +56,12 @@ $svcPrincipalCreds = New-AzureADApplicationPasswordCredential -ObjectId $svcPrin
 
 # Before you create the role assignment for your service principal, view your credentials and write them down!
 # https://docs.microsoft.com/en-us/azure/virtual-desktop/create-service-principal-role-powershell#view-your-credentials-in-powershell
-Write-Host 'Before you create the role assignment for your service principal, view your credentials and write them down! We will also create a CSV file backup' -BackgroundColor Red
+Write-Host -Object 'Before you create the role assignment for your service principal, view your credentials and write them down! We will also create a CSV file backup' -BackgroundColor Red
 $svcPrincipalCreds.Value
 $aadContext.TenantId.Guid
 $svcPrincipal.AppId
-
-$PathToBackupServicePrincipalCredInfo = Read-Host 'Where would you like to backup your Service Principal Account information to CSV, example c:\admin'
+# Create CSV backup of SPA info
+$PathToBackupServicePrincipalCredInfo = Read-Host 'Where would you like to backup your Service Principal Account information to CSV, please enter a folder location, example c:\admin'
 # Create Directory if does not exist
 if (! (Test-Path -Path $PathToBackupServicePrincipalCredInfo)){
     New-Item -Path $PathToBackupServicePrincipalCredInfo -ItemType Directory|Out-Null
@@ -83,8 +84,10 @@ New-RdsRoleAssignment -RoleDefinitionName "RDS Owner" -ApplicationId $svcPrincip
 
 # Test Service Principal account
 # https://docs.microsoft.com/en-us/azure/virtual-desktop/create-service-principal-role-powershell#sign-in-with-the-service-principal
-$creds = New-Object System.Management.Automation.PSCredential($svcPrincipal.AppId, (ConvertTo-SecureString $svcPrincipalCreds.Value -AsPlainText -Force))
-Add-RdsAccount -DeploymentUrl "https://rdbroker.wvd.microsoft.com" -Credential $creds -ServicePrincipal -AadTenantId $aadContext.TenantId.Guid
+$SPACreds = New-Object System.Management.Automation.PSCredential($svcPrincipal.AppId, (ConvertTo-SecureString $svcPrincipalCreds.Value -AsPlainText -Force))
+if (Add-RdsAccount -DeploymentUrl "https://rdbroker.wvd.microsoft.com" -Credential $SPACreds -ServicePrincipal -AadTenantId $aadContext.TenantId.Guid) {
+    Write-Host -Object 'Service Principal Account is working!' -BackgroundColor Green
+}
 
 
 # Create a host pool with PowerShell
@@ -122,30 +125,6 @@ New-RdsRegistrationInfo -TenantName $onmicosofttenant -HostPoolName $HostPoolNam
 $HostPoolSessionHostToken = (Export-RdsRegistrationInfo -TenantName $onmicosofttenant -HostPoolName $HostPoolName).Token
 Write-Host -Object "Your HostPool Registration Token for registing your SessionHost to the $HostPoolName host pool is $HostPoolSessionHostToken" -BackgroundColor Red
 
-
-<#
-# Create a host pool by using the Azure Marketplace
-# https://docs.microsoft.com/en-us/azure/virtual-desktop/create-host-pools-azure-marketplace
-
-Add-RdsAccount -DeploymentUrl "https://rdbroker.wvd.microsoft.com"
-
-Start 'https://portal.azure.com/'
-
-
-Write-Host "Windows Virtual Desktop tenant information`
-For the Windows Virtual Desktop tenant information blade:`
-`
-For Windows Virtual Desktop tenant group name, enter the name for the tenant group that contains your tenant. Leave it as the default unless you were provided a specific tenant group name.`
-For Windows Virtual Desktop tenant name, enter the name of the tenant where you'll be creating this host pool.`
-Specify the type of credentials that you want to use to authenticate as the Windows Virtual Desktop tenant RDS Owner. If you completed the Create service principals and role assignments with PowerShell tutorial, select Service principal. When Azure AD tenant ID appears, enter the ID for the Azure Active Directory instance that contains the service principal.`
-Enter the credentials for the tenant admin account. Only service principals with a password credential are supported.`
-Select OK.`
-"
-
-#
-
-#Add users to host pool
-
-
-Add-RdsAppGroupUser $onmicosofttenant <hostpoolname> "Desktop Application Group" -UserPrincipalName <userupn>
-#>
+# You will have to create the VM's and and add them to the HostPool for use.
+# Register the virtual machines to the Windows Virtual Desktop host pool
+# https://docs.microsoft.com/en-us/azure/virtual-desktop/create-host-pools-powershell#register-the-virtual-machines-to-the-windows-virtual-desktop-host-pool
