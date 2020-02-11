@@ -1,11 +1,11 @@
-﻿# Microsoft Windows Virutal Desktop Tenant Setup
+# Microsoft Windows Virutal Desktop Tenant Setup
 # https://docs.microsoft.com/en-us/azure/virtual-desktop/
 # Author: Nicholas Eckermann
 # Email: nicholas.eckermann@gmail.com
 # 
 
 # Tenant we are working with
-$onmicosofttenant = Read-Host -Prompt 'Tenant we are working with, example client.onmicrosoft.com'
+$onmicosofttenant = Read-Host -Prompt 'Example: rsmdavdemo.onmicrosoft.com'
 
 
 # Verify Modules needed are installed
